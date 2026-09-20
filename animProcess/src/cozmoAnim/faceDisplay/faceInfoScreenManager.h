@@ -149,7 +149,8 @@ private:
                            bool& buttonPressedEvent,
                            bool& buttonReleasedEvent,
                            bool& singlePressDetected, 
-                           bool& doublePressDetected);
+                           bool& doublePressDetected,
+                           bool& triplePressDetected);
   
   // Returns true if screenName is one of the screens that allow the user to enter pairing when
   // double pressing the backpack and on the charger
@@ -246,6 +247,9 @@ private:
 
   std::string _sysconVersion = "";
   
+  // Toggle a full speaker mute (master volume 0 <-> full)
+  void ToggleSpeakerMute();
+
   // Reboot Linux
   void Reboot();
 

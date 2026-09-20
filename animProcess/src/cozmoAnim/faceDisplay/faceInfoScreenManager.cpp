@@ -65,8 +65,10 @@
 #include <sys/reboot.h>
 #endif
 
+#include "cozmoAnim/audio/cozmoAudioController.h"
+
 // CHANGE THIS TO BE YOUR PROJECT'S STUFF
-const std::string OSProject = "WireOS";
+const std::string OSProject = "VictorOS";
 const std::string Creator = "By Wire/kercre123";
 const std::string CreatorWebsite = "kerigan.dev";
 
@@ -224,7 +226,7 @@ void FaceInfoScreenManager::Init(Anim::AnimContext* context, Anim::AnimationStre
   ADD_SCREEN(Main, Network);
   ADD_SCREEN_WITH_TEXT(ClearUserData, Main, {"CLEAR OUT SOUL?"});
   ADD_SCREEN_WITH_TEXT(ClearUserDataFail, Main, {"UNABLE TO CLEAR SOUL"});
-  ADD_SCREEN_WITH_TEXT(Rebooting, Rebooting, {"Vector will remember that..."});
+  ADD_SCREEN_WITH_TEXT(Rebooting, Rebooting, {"Run..."});
   ADD_SCREEN_WITH_TEXT(SelfTest, Main, {"START SELF TEST?"});
   ADD_SCREEN(SelfTestRunning, SelfTestRunning)
   ADD_SCREEN(Network, SensorInfo);
@@ -929,79 +931,66 @@ void FaceInfoScreenManager::DrawConfidenceClock(
   DrawScratch();
 }
 
-void FaceInfoScreenManager::CheckForButtonEvent(const bool buttonPressed, 
+void FaceInfoScreenManager::CheckForButtonEvent(const bool buttonPressed,
                                                 bool& buttonPressedEvent,
                                                 bool& buttonReleasedEvent,
-                                                bool& singlePressDetected, 
-                                                bool& doublePressDetected)
+                                                bool& singlePressDetected,
+                                                bool& doublePressDetected,
+                                                bool& triplePressDetected)
 {
-  static u32  lastPressTime_ms   = 0;
-  static bool singlePressPending = false;
-  static bool doublePressPending = false;
+  static u32  lastReleaseTime_ms = 0;
+  static u32  firstPressTime_ms  = 0;
+  static int  pressCount         = 0;
   static bool buttonWasPressed   = false;
-
-  // Whether or not the shutdown message was already sent
   static bool shutdownSent       = false;
 
   buttonPressedEvent  = !buttonWasPressed && buttonPressed;
   buttonReleasedEvent = buttonWasPressed && !buttonPressed;
-  buttonWasPressed = buttonPressed;
+  buttonWasPressed    = buttonPressed;
   singlePressDetected = false;
   doublePressDetected = false;
+  triplePressDetected = false;
 
-  // The maximum amount of time allowed between button releases
-  // to register as a double press
-  static const u32 kDoublePressWindow_ms   = 700;
-
-  const u32  curTime_ms         = BaseStationTimer::getInstance()->GetCurrentTimeStamp();
-  const bool mightBeDoublePress = (lastPressTime_ms > 0) && (curTime_ms - lastPressTime_ms < kDoublePressWindow_ms);
+  // Max time between button releases to count as part of the same multi-press
+  static const u32 kMultiPressWindow_ms = 700;
+  const u32 curTime_ms = BaseStationTimer::getInstance()->GetCurrentTimeStamp();
 
   if (buttonPressedEvent) {
-    if (mightBeDoublePress) {
-      lastPressTime_ms = 0;
-      doublePressPending = true;
-    } else {
-      lastPressTime_ms = curTime_ms;
+    if (pressCount == 0) {
+      firstPressTime_ms = curTime_ms;
     }
-    singlePressPending = false;
   } else if (buttonReleasedEvent) {
-    if (lastPressTime_ms > 0) {
-      singlePressPending = true;
-    } else if (doublePressPending) {
-      doublePressPending = false;
-      doublePressDetected = true;
-    }
+    ++pressCount;
+    lastReleaseTime_ms = curTime_ms;
     shutdownSent = false;
-  } else if (singlePressPending && !mightBeDoublePress) {
-    lastPressTime_ms = 0;
-    singlePressPending = false;
-    singlePressDetected = true;
   }
 
-  // Check if button was held down long enough for shutdown animation to start
-  const bool shouldTriggerShutdown = buttonPressed && 
-                                     (lastPressTime_ms > 0) && 
-                                     (curTime_ms - lastPressTime_ms > kButtonPressDurationForShutdown_ms) &&
+  // Once the multi-press window elapses (and the button is up), resolve the count
+  if (pressCount > 0 && !buttonPressed &&
+      (curTime_ms - lastReleaseTime_ms >= kMultiPressWindow_ms)) {
+    if      (pressCount == 1) { singlePressDetected = true; }
+    else if (pressCount == 2) { doublePressDetected = true; }
+    else                      { triplePressDetected = true; } // 3 or more
+    pressCount        = 0;
+    firstPressTime_ms = 0;
+  }
+
+  // Button held down long enough -> shutdown animation (only on None screen)
+  const bool shouldTriggerShutdown = buttonPressed &&
+                                     (firstPressTime_ms > 0) &&
+                                     (curTime_ms - firstPressTime_ms > kButtonPressDurationForShutdown_ms) &&
                                      (GetCurrScreenName() == ScreenName::None);
   if (shouldTriggerShutdown && !shutdownSent) {
     LOG_INFO("FaceInfoScreenManager.CheckForButtonEvent.StartShutdownAnim", "");
     RobotInterface::SendAnimToEngine(StartShutdownAnim());
-    lastPressTime_ms    = 0;
-    singlePressPending  = false;
-    singlePressDetected = false;
-    doublePressPending  = false;
-    doublePressDetected = false;
-    shutdownSent        = true;
+    pressCount        = 0;
+    firstPressTime_ms = 0;
+    shutdownSent      = true;
   }
-  
+
 #if ANKI_DEV_CHEATS
-  if( kFakeButtonPressType == 1 ) { // single press
-    singlePressDetected = true;
-    kFakeButtonPressType = 0;
-  } else if( kFakeButtonPressType == 2 ) { // double press
-    doublePressDetected = true;
-    kFakeButtonPressType = 0;
-  }
+  if( kFakeButtonPressType == 1 ) { singlePressDetected = true; kFakeButtonPressType = 0; }
+  else if( kFakeButtonPressType == 2 ) { doublePressDetected = true; kFakeButtonPressType = 0; }
 #endif
 }
 
@@ -1014,6 +1003,19 @@ void FaceInfoScreenManager::ResetObservedHeadAndLiftAngles()
   _headHighestAngle_rad = std::numeric_limits<f32>::lowest();
 }
 
+void FaceInfoScreenManager::ToggleSpeakerMute()
+{
+  static bool s_speakerMuted = false;
+  s_speakerMuted = !s_speakerMuted;
+
+  auto* audio = _context->GetAudioController();
+  if (audio != nullptr) {
+    audio->SetParameter(audio->GetAudioIdFromString("Robot_Vic_Volume_Master"),
+                        s_speakerMuted ? 0.0f : 1.0f, Audio::CozmoAudioController::kInvalidAudioGameObject);
+  }
+  LOG_INFO("FaceInfoScreenManager.ToggleSpeakerMute", "%s", s_speakerMuted ? "muted" : "unmuted");
+}
+
 void FaceInfoScreenManager::ProcessMenuNavigation(const RobotState& state)
 {
   const bool buttonIsPressed = static_cast<bool>(state.status & (uint32_t)RobotStatusFlag::IS_BUTTON_PRESSED);
@@ -1021,11 +1023,13 @@ void FaceInfoScreenManager::ProcessMenuNavigation(const RobotState& state)
   bool buttonReleasedEvent;
   bool singlePressDetected;
   bool doublePressDetected;
+  bool triplePressDetected;
   CheckForButtonEvent(buttonIsPressed, 
                       buttonPressedEvent, 
                       buttonReleasedEvent, 
                       singlePressDetected, 
-                      doublePressDetected);
+                      doublePressDetected,
+                      triplePressDetected);
 
   const bool isOnCharger = static_cast<bool>(state.status & (uint32_t)RobotStatusFlag::IS_ON_CHARGER);
 
@@ -1070,6 +1074,17 @@ void FaceInfoScreenManager::ProcessMenuNavigation(const RobotState& state)
           CanEnterPairingFromScreen(currScreenName))
   {
     ToggleMute("DOUBLE_PRESS");
+  }
+
+  // Triple press: on charger -> jump straight to CCIS; off charger -> toggle speaker mute
+  if (triplePressDetected && _engineLoaded) {
+    if (isOnCharger) {
+      LOG_INFO("FaceInfoScreenManager.ProcessMenuNavigation.TriplePressOnCharger", "Entering CCIS");
+      SetScreen(ScreenName::Main);
+    } else {
+      LOG_INFO("FaceInfoScreenManager.ProcessMenuNavigation.TriplePressOffCharger", "Toggling speaker mute");
+      ToggleSpeakerMute();
+    }
   }
 
   // Check for button press to go to next debug screen

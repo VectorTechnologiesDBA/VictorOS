@@ -45,7 +45,7 @@ namespace {
 u32 _pin = 123456;
 
 const f32 kRobotNameScale = 0.7f;
-const std::string kURLDef = "v.pvic.xyz";
+const std::string kURLDef = "vectortech.dev/v";
 const std::string kURLWP = "wp.pvic.xyz";
 const ColorRGBA   kColor(0.9f, 0.5f, 0.9f, 1.f);
 
