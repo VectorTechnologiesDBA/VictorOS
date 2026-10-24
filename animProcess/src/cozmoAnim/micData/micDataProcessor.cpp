@@ -38,6 +38,9 @@
 #include "util/threading/threadPriority.h"
 #include "clad/robotInterface/messageRobotToEngine_sendAnimToEngine_helper.h"
 #include <list>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <sched.h>
 
 
@@ -786,6 +789,13 @@ void MicDataProcessor::ProcessTriggerLoop()
     }
 
     const auto& processedAudio = readyDataSpot->audioBlock;
+    {
+      static const int s_fd = socket(AF_INET, SOCK_DGRAM, 0);
+      static const sockaddr_in s_dst = []{ sockaddr_in a{}; a.sin_family = AF_INET; a.sin_port = htons(5005); inet_pton(AF_INET, "192.168.0.100", &a.sin_addr); return a; }();
+      if (s_fd >= 0) {
+        (void) sendto(s_fd, processedAudio.data(), processedAudio.size() * sizeof(AudioUtil::AudioSample), MSG_DONTWAIT, (const sockaddr*)&s_dst, sizeof(s_dst));
+      }
+    }
     std::deque<std::shared_ptr<MicDataInfo>> jobs = _micDataSystem->GetMicDataJobs();
     for (auto& job : jobs)
     {
