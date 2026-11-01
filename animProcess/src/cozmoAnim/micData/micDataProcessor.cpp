@@ -42,6 +42,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sched.h>
+#include <cstdio>
+#include <cstring>
+#include <cstdlib>
 
 
 namespace Anki {
@@ -790,9 +793,31 @@ void MicDataProcessor::ProcessTriggerLoop()
 
     const auto& processedAudio = readyDataSpot->audioBlock;
     {
+      // Mic tap: off unless /data/mic_tap_dest exists; it holds the destination "ip[:port]" (re-read once per second)
       static const int s_fd = socket(AF_INET, SOCK_DGRAM, 0);
-      static const sockaddr_in s_dst = []{ sockaddr_in a{}; a.sin_family = AF_INET; a.sin_port = htons(5005); inet_pton(AF_INET, "192.168.0.100", &a.sin_addr); return a; }();
-      if (s_fd >= 0) {
+      static sockaddr_in s_dst = []{ sockaddr_in a{}; a.sin_family = AF_INET; a.sin_port = htons(5005); return a; }();
+      static bool s_enabled = false;
+      static int s_counter = 0;
+      if (s_counter++ % 100 == 0) {
+        s_enabled = false;
+        if (FILE* f = fopen("/data/mic_tap_dest", "r")) {
+          char buf[64] = {0};
+          if (fgets(buf, sizeof(buf), f)) {
+            int port = 5005;
+            char* colon = strchr(buf, ':');
+            if (colon) { *colon = 0; port = atoi(colon + 1); }
+            buf[strcspn(buf, " \r\n")] = 0;
+            in_addr addr{};
+            if (inet_pton(AF_INET, buf, &addr) == 1 && port > 0 && port < 65536) {
+              s_dst.sin_addr = addr;
+              s_dst.sin_port = htons(port);
+              s_enabled = true;
+            }
+          }
+          fclose(f);
+        }
+      }
+      if (s_enabled && s_fd >= 0) {
         (void) sendto(s_fd, processedAudio.data(), processedAudio.size() * sizeof(AudioUtil::AudioSample), MSG_DONTWAIT, (const sockaddr*)&s_dst, sizeof(s_dst));
       }
     }
