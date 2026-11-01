@@ -30,6 +30,9 @@ void SetBLEPin(uint32_t pin);
 
 bool InitConnectionFlow(Anim::AnimationStreamer* animStreamer);
 
+// Animates the start pairing screen; call every tick
+void TickConnectionFlow(Anim::AnimationStreamer* animStreamer);
+
 void UpdateConnectionFlow(const SwitchboardInterface::SetConnectionStatus& msg,
                           Anim::AnimationStreamer* animStreamer,
                           const Anim::AnimContext* context);

@@ -942,6 +942,7 @@ Result AnimProcessMessages::Update(BaseStationTime_t currTime_nanosec)
   {
     _connectionFlowInited = InitConnectionFlow(_animStreamer);
   }
+  TickConnectionFlow(_animStreamer);
 
   if (!AnimComms::IsConnectedToRobot()) {
     static bool faultCodeDisplayed = false;

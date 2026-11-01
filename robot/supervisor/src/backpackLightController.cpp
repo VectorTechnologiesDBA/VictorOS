@@ -110,20 +110,8 @@ namespace BackpackLightController {
     const u16 kTimeDiff_ms = 600;
     for(u8 i = 0; i < (u8)LEDId::NUM_BACKPACK_LEDS; i++)
     {
-      u32 color;
-      if (_ankilights()) {
-          color = 0x80808000;
-      } else {
-        if(i == 0) {
-          color = 0x80ff0000; // red for back led
-        } else if(i == 1) {
-          color = 0x8000ff00; // green for middle led
-        } else if(i == 2) {
-          color = 0x800000ff; // blue for top led
-        } else {
-          color = 0x80808000; // fallback color
-        }
-      }  
+      // Anki's boot sweep: soft white on all three lights (VictorOS used red/green/blue here)
+      const u32 color = 0x80808000;
     
       _ledParams[(int)BackpackLightLayer::BPL_USER].lights[i] = {
         .onColor = color,
