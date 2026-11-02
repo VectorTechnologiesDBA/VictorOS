@@ -1,246 +1,54 @@
-# WireOS - /anki folder
+# VictorOS
 
-**This is where the personality code for WireOS exists.**
+**VictorOS is custom firmware for the Anki Vector robot, built on [WireOS](https://github.com/os-vector/wire-os) and pulled back toward the original Anki experience.**
 
-For the entire OS, check out the [wire-os](https://github.com/os-vector/wire-os) repo. This repo, `wire-os-victor`, is a submodule of that, and just builds the /anki folder which goes into that OS. However, `wire-os-victor` can still be built standalone and deployed to a robot which is running a good base OTA. This is recommended for developers.
+A Vector running VictorOS should feel like the robot you took out of the box: the original Anki boot, processing and backpack lights (including the low-battery light), a clean setup screen, and stock behavior, while keeping the openness of custom firmware.
 
-Most changes happen in this repo. If one wants to, for instance, add a new feature; this is where they'd do it.
+This repo is the `/anki` folder of the OS (the robot's personality, setup flow and services).
 
-If you want to add a program to the OS, do that in [wire-os](https://github.com/os-vector/wire-os).
+## Download
 
-Check [vector-docs](https://os-vector.github.io/vector-docs) for more information about the source code leak, what we can do with this, and general Vector info.
+Get the latest OTA from the [Releases page](https://github.com/VectorTechnologiesDBA/VictorOS/releases/latest), or flash it straight from VTCS.
 
-## What is WireOS?
+### Flashing
 
-WireOS serves as a stable, up-to-date, easily-buildable base for CFW, and is a continuation of Anki's work.
+1. Put your Vector in recovery mode (place him on the charger and hold the backpack button for about 15 seconds).
+2. Open the setup page and connect to your Vector.
+3. Enter this OTA URL:
 
-Any feature added here should be somewhat objectively applicable to other CFW. Feel free to make a PR. Wire encourages PRs which add things like 3rd-party library upgrades, new behaviors which Anki might have planned to add, code documentation, and optimizations. Wire discourages PRs which significantly alter the experience, like transforming him into a (soulless) GPT box or making him into Cozmo. If you want to do something like that, make your own CFW (instructions in [vector-docs](https://os-vector.github.io/vector-docs)).
+```
+http://server.vectortech.dev:8088/vic/full/latest.ota
+```
+
+Updating keeps your Vector's data: his account link, name, Wi-Fi and settings carry over.
+
+## VTCS (Vector Tech Community Server)
+
+VictorOS is made to work with **VTCS**, the Vector Tech Community Server at `server.vectortech.dev`. It replaces Anki's cloud, so there's nothing to host yourself.
+
+- **Accounts:** sign up in the [VTCS Vector app](https://github.com/VectorTechnologiesDBA/vtcs-app/releases/latest) or at [vectortech.dev/account.html](https://vectortech.dev/account.html). Your Vectors are linked to your account, and you can remove one there after a factory reset.
+- **Voice commands, weather and knowledge graph:** set per robot from the account page (OpenWeatherMap or WeatherAPI.com; OpenAI, Together AI, any OpenAI-compatible endpoint, or Houndify).
+- **Weather location:** set per robot on the account page.
+- **Extras anywhere:** Drive, camera, Talk, eye color and quick actions work even when your Vector is on a different network from you. Vectors outside the server's network keep a secure relay connection to VTCS (`vtcs-relay`).
+- **Automatic updates:** Vectors check VTCS for new VictorOS versions and install them on their own. You can also check from the app under **Settings → Updates**.
+
+Prefer to run your own server? VictorOS also works with [WirePod](https://github.com/kercre123/wire-pod). The [setup guide](https://vectortech.dev/v.html) walks through both.
+
+## What's changed from WireOS
+
+- Setup screen with the robot's name, a teal V spinning on a tablet, and `vectortech.dev/v`
+- Original Anki boot sweep, processing and backpack lights
+- Points at VTCS for its cloud, OTA updates and the relay
+- Update checks from the app's Updates screen, and automatic updates on dev builds
+- Mic data tap off unless enabled (`/data/mic_tap_dest`)
 
 ## Building
 
-`wire-os-victor` can be built standalone on most Linux distros (arm64 or amd64) and on macOS (arm64/M-series).
+VictorOS builds the same way as WireOS. Follow the build instructions in [wire-os](https://github.com/os-vector/wire-os) and [wire-os-victor](https://github.com/os-vector/wire-os-victor), using this repo in place of `wire-os-victor`.
 
-For Linux, the Docker method is recommended for now (especially if you have a weird or old Linux distro installed), though bare metal works nicely too.
+## Credits
 
-Note that if you have built in Docker before and want to build on bare metal now (or vice-versa), you should do a [clean](#cleaning) build.
-
-Click an option below for instructions.
-
-<details>
-<summary><strong>Docker: x86_64 or arm64 Linux</strong></summary>
-<br />
-
-- Prerequisites: Make sure you have `docker` and `git` installed.
-
-1. Clone the repo and `cd` into it:
-
-```
-cd ~
-git clone --recurse-submodules https://github.com/os-vector/wire-os-victor
-cd wire-os-victor
-```
-
-2. Make sure you can run Docker as a normal user. This will probably involve:
-
-```
-sudo groupadd docker
-sudo gpasswd -a $USER docker
-newgrp docker
-sudo chown root:docker /var/run/docker.sock
-sudo chmod 660 /var/run/docker.sock
-```
-
-3. Run the build script:
-```
-cd ~/wire-os-victor
-./build/build-v.sh
-```
-
-</details>
-
-<details>
-<summary><strong>Bare Metal: x86_64 or arm64 Linux</strong></summary>
-<br \>
-
-- Prerequisites:
-  - glibc 2.35 or above - this means anything Debian Bookworm-era and newer will work.
-  - The following packages need to be installed: `git wget curl openssl ninja g++ gcc pkg-config ccache`
-```
-# Arch Linux:
-sudo pacman -S git wget curl openssl ninja gcc pkgconf ccache
-# Ubuntu/Debian:
-sudo apt-get update && sudo apt-get install -y git wget curl openssl ninja-build gcc g++ pkg-config ccache
-# Fedora
-sudo dnf install -y git wget curl openssl ninja-build gcc gcc-c++ pkgconf-pkg-config ccache
-```
-
-1. Clone the repo and `cd` into it:
-
-```
-cd ~
-git clone --recurse-submodules https://github.com/os-vector/wire-os-victor
-cd wire-os-victor
-```
-
-2. Source `setenv.sh`:
-```
-source setenv.sh
-```
-
-3. (OPTIONAL) Run this so you don't have to perform step 2 every time:
-```
-echo "source \"$(pwd)/setenv.sh\"" >> $HOME/.bashrc
-```
-
-4. Build:
-```
-vbuild
-```
-
-</details>
-
-<details>
-
-<summary><strong>macOS (M-series only)</strong></summary>
-<br />
-
-- Prereqs: Make sure you have [brew](https://brew.sh/) installed.
-  -  Then: `brew install ccache gcc ninja pkg-config upx wget`
-
-1. Clone the repo and cd into it:
-
-```
-cd ~
-git clone --recurse-submodules https://github.com/os-vector/wire-os-victor
-cd victor
-```
-
-2. Run the build script:
-```
-cd ~/wire-os-victor
-./build/build-v.sh
-```
-
-</details>
-
-## Deploying
-
-1. Install WireOS on your robot.
-2. Get your robot's IP through CCIS:
-  - 1. Place your robot on the charger
-  - 2. Double click the button
-  - 3. Lift the lift up then down
-  - 4. Write down the IP address somewhere
-  - 5. Lift the lift up then down again to exit CCIS
-3. One of the following:
-
-<details>
-<summary><strong>(Docker: x86_64 or arm64 Linux) or (macOS M-series)</strong></summary>
-<br \>
-
-- Run:
-
-```
-./build/deploy-v.sh
-```
-</details>
-
-<details>
-<summary><strong>Bare Metal: x86_64 or arm64 Linux</strong></summary>
-<br \>
-
-- Run:
-
-```
-vdeploy
-```
-</details>
-
-## Simulator
-
-`wire-os-victor` can be run in WeBots. A mostly fully-featured Vector experience without needing a real robot to deploy to.
-
-This only works with a relatively beefy x86_64 Linux machine.
-
-To do this: 
-
-1. Follow the prereq instructions in "Bare Metal: x86_64 or arm64 Linux" in the above section
-
-2. Install qemu-static-arm and libasound2-dev, make sure systemd-binfmt is set up to handle ARM programs
-
-```
-# Arch:
-sudo pacman -S qemu-user-static qemu-user-static-binfmt alsa-lib opus
-sudo systemctl enable --now systemd-binfmt.service
-# if already enabled
-sudo systemctl restart systemd-binfmt.service
-
-# Debian / Ubuntu:
-sudo apt install qemu-user-static qemu-user-binfmt libasound2-dev libopus-dev
-sudo systemctl restart systemd-binfmt.service
-
-# Fedora
-sudo dnf install qemu-user-static qemu-user-binfmt alsa-lib opus
-sudo systemctl restart systemd-binfmt.service
-```
-
-3. Run:
-
-```
-./sim.sh
-```
-
-That will eventually open up `mprocs`, a program for managing multiple processes. Press `q` in that terminal window to exit, and click "Close without saving" in WeBots if asked.
-
-## Cozmo
-
-You can run the victor processes on your computer and use Cozmo as the vessel.
-
-If you have a beefy x86_64 Linux machine with a Wi-Fi card, go for it!
-
-Follow the simulator instructions, but instead of `./sim.sh`, run:
-
-```
-./sim.sh -cozmo
-```
-
-Make sure you're connected to the internet while the script is running, as it downloads dependencies.
-
-If you have more than one network adapter, you can have one connected to the internet and one connected to Cozmo at the same time throughout the whole process.
-
-If you only have one, you can just run the script while connected to the internet, and it will tell you when you should change your network over to Cozmo. Also note that if you have run it once, you don't need the internet to run it a second time.
-
-## Cleaning
-
-99% of the time, if you're working on a behavior or something, you don't need to clean any build directories. The CMakeLists are correctly setup to properly rebuild the code which needs to be rebuilt upon a file change.
-
-If you do want to clean anyway:
-
-<details>
-<summary><strong>(Docker: x86_64 or arm64 Linux) or (macOS M-series)</strong></summary>
-<br \>
-
-- Run:
-
-```
-./build/clean.sh
-```
-</details>
-
-<details>
-<summary><strong>Bare Metal: x86_64 or arm64 Linux</strong></summary>
-<br \>
-
-- Run:
-
-```
-vclean
-```
-</details>
-
-## VSCode Code Completion
-
-- After you build for the first time, two files will be generated and placed in the root of the source directory:
-  - `compile_commands.json`
-  - `.clangd`
-- If you install the [`clangd`](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd) extension for VSCode then relaunch VSCode after a build, it will index the code and you will have speedy code completion, error underlining+explanations, function descriptions, and such for the entire codebase.
+- **Wire** ([os-vector](https://github.com/os-vector)) for WireOS, which VictorOS is built on
+- **kercre123** for [WirePod](https://github.com/kercre123/wire-pod)
+- **Anki** and **Digital Dream Labs** for Vector
+- Built by **Jaceroo404** and **DevHayes** at [Vector Tech](https://vectortech.dev)
